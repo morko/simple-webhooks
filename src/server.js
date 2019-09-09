@@ -2,6 +2,7 @@ const http = require("http");
 const crypto = require("crypto");
 const digest = require("./digest");
 const logger = require("./logger");
+const Queue = require("./queue");
 
 /**
  * HTTP Webhook server that executes a job if the client uses the same secret
@@ -31,13 +32,20 @@ class WebhookServer {
 
     this.port = opt.port || 8338;
 
-    this.httpServer = http.createServer(this.handleRequest.bind(this));
-
-    this.httpServer.on("error", err => {
-      logger.error(err);
-    });
+    this.httpServer = this.createServer();
+    this.jobQueue = new Queue();
+    this.currentJob = null;
   }
 
+  createServer() {
+    let httpServer = http.createServer(this.handleRequest.bind(this));
+
+    httpServer.on("error", err => {
+      logger.error(err);
+    });
+
+    return httpServer;
+  }
   /**
    * Starts listening for the connections.
    *
@@ -77,6 +85,24 @@ class WebhookServer {
 
       this.httpServer.close();
     });
+  }
+
+  async executeQueue() {
+    if (!this.jobQueue.peek()) {
+      return;
+    }
+    this.currentJob = this.jobQueue.dequeue();
+    await this.currentJob.job(this.currentJob.data);
+    this.executeQueue();
+  }
+
+  async queueJob(job, data) {
+    const jobDescriptor = {
+      job,
+      data
+    };
+    this.jobQueue.enqueue(jobDescriptor);
+    if (!this.currentJob) this.executeQueue();
   }
 
   /**
