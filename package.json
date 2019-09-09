@@ -1,6 +1,6 @@
 {
   "name": "simple-webhooks",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Webhook client and server.",
   "main": "index.js",
   "scripts": {
