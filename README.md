@@ -3,6 +3,7 @@
 Webhooks made simple!
 
 Features
+
 - Client and server side implementations.
 - Protected against timing attacks.
 
@@ -23,7 +24,7 @@ const client = new WebhookClient({
   secret: secret
 });
 
-let data = 'Hi!';
-
-client.trigger(data);
+server.listen().then(() => {
+  client.trigger('Hi');
+})
 ```
