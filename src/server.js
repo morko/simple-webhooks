@@ -93,6 +93,7 @@ class WebhookServer {
     }
     this.currentJob = this.jobQueue.dequeue();
     await this.currentJob.job(this.currentJob.data);
+    this.currentJob = null;
     this.executeQueue();
   }
 
