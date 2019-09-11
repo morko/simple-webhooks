@@ -28,7 +28,7 @@ function createRequest(opt) {
     method: "POST",
     headers: {
       "X-Hub-Signature": digest(opt.data, opt.secret),
-      "X-SimpleWebhook-Delivery": uuidv4()
+      "X-SimpleWebhooks-Delivery": uuidv4()
     }
   };
   const req = http.request(opt.url, options);

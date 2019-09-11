@@ -1,5 +1,8 @@
 const http = require("http");
 const crypto = require("crypto");
+const uuidv4 = require("uuid/v4");
+const EventEmitter = require('events');
+
 const digest = require("./digest");
 const logger = require("./logger");
 const Queue = require("./queue");
@@ -10,7 +13,7 @@ const Queue = require("./queue");
  *
  * The signature is delivered in the X-Hub-Signature header.
  */
-class WebhookServer {
+class WebhookServer extends EventEmitter {
   /**
    * Creates a HTTP Webhook server.
    *
@@ -22,6 +25,8 @@ class WebhookServer {
    * @returns {WebhookServer} - The created server.
    */
   constructor(opt) {
+    super();
+
     opt = opt || {};
 
     if (!opt.secret) throw new TypeError("invalid arguments");
@@ -89,18 +94,23 @@ class WebhookServer {
 
   async executeQueue() {
     if (!this.jobQueue.peek()) {
+      this.emit("job-queue-empty");
       return;
     }
     this.currentJob = this.jobQueue.dequeue();
+    logger.debug(`EXECUTE: ${this.currentJob.uuid}`)
     await this.currentJob.job(this.currentJob.data);
     this.currentJob = null;
-    this.executeQueue();
+    setTimeout(() => this.executeQueue(), 0);
   }
 
-  async queueJob(job, data) {
+  async queueJob(job, data, uuid) {
+    uuid = uuid || uuidv4();
+    logger.debug(`QUEUE: ${uuid}`)
     const jobDescriptor = {
       job,
-      data
+      data,
+      uuid
     };
     this.jobQueue.enqueue(jobDescriptor);
     if (!this.currentJob) this.executeQueue();
@@ -111,8 +121,9 @@ class WebhookServer {
    * @private
    */
   handleRequest(req, res) {
-    let accepted = false;
-    let data = '';
+
+    let data = "";
+    let uuid = "";
 
     req.on("data", chunk => {
       const localSig = digest(chunk, this.secret);
@@ -124,6 +135,8 @@ class WebhookServer {
         logger.info(`BLOCKED: ${remoteAddr}`);
         return;
       }
+      
+      uuid = req.headers["x-simplewebhooks-delivery"] || "";
 
       if (
         crypto.timingSafeEqual(
@@ -132,20 +145,20 @@ class WebhookServer {
         )
       ) {
         logger.info(`ACCEPTED: ${remoteAddr}`);
-        accepted = true;
-        data += chunk
+        data += chunk;
       } else {
         logger.info(`BLOCKED: ${remoteAddr}`);
-        accepted = false;
       }
+
     });
 
     req.on("end", () => {
-      res.end();
-      if (accepted) {
-        this.job(data);
+      if (data) {
+        setTimeout(() => this.queueJob(this.job, data, uuid), 1);
       }
+      res.end();
     });
+
   }
 }
 
