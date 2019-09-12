@@ -54,3 +54,7 @@ Features
 
     client.trigger('Hi');
     ```
+
+## Documentation
+
+- [API](https://morko.github.io/simple-webhooks/)
